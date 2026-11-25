@@ -7,6 +7,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <UseWindowsForms>true</UseWindowsForms>
+    <!-- exe の名前は PomodoroTimer.exe。名前空間はプロジェクト名のまま -->
+    <AssemblyName>PomodoroTimer</AssemblyName>
+    <RootNamespace>PomodoroTimer.App</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>

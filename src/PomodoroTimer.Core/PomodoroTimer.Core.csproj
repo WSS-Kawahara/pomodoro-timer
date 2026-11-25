@@ -4,6 +4,8 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <!-- デバッグ情報（PDB）を dll に入れる。単一exeの発行で pdb が別ファイルとして出ないようにする -->
+    <DebugType>embedded</DebugType>
   </PropertyGroup>
 
   <ItemGroup>

@@ -123,3 +123,10 @@
 | App | ViewModels/MainViewModel.cs | メイン画面の表示とON/OFF・設定ボタン |
 | App | ViewModels/SettingsViewModel.cs | 設定画面の入力・入力チェック・保存 |
 | App | ViewModels/MiniWidgetViewModel.cs | ミニ表示の状態の色と表示文字列 |
+
+## 8. ビルドと配布
+
+- 配布物は .NET 同梱（self-contained）・win-x64・単一ファイルの exe 1つ（PomodoroTimer.exe）。WPF のネイティブDLLと祝日CSVも exe に含まれる
+- 発行の設定は src/PomodoroTimer.App/Properties/PublishProfiles/win-x64.pubxml に書く
+- 作成コマンド：dotnet publish src/PomodoroTimer.App -p:PublishProfile=win-x64
+- 出力先：publish/win-x64/（Git 管理外）

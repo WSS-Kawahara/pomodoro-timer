@@ -34,6 +34,7 @@ docs/spec.md                   仕様書
 - 時刻まわりの境界（区間の開始ちょうど・終了ちょうど、昼休憩をまたぐ、祝日、土日、OFFの翌日解除など）は必ずテストで押さえる
 - 作業の区切りごとに `dotnet build` と `dotnet test` を実行し、すべて通ることを確認する
 - コメントとコミットメッセージは日本語で書く
+- Claude Code の返事・報告は日本語で書く
 - 1回の作業で大きく作りすぎない。指示されたフェーズの範囲だけを実装する
 
 ## よく使うコマンド
@@ -42,5 +43,5 @@ docs/spec.md                   仕様書
 dotnet build
 dotnet test
 dotnet run --project src/PomodoroTimer.App
-dotnet publish src/PomodoroTimer.App -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
+dotnet publish src/PomodoroTimer.App -p:PublishProfile=win-x64
 ```
