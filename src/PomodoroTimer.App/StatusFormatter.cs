@@ -38,6 +38,12 @@ public static class StatusFormatter
             ? $"{status.Cycle} / {TimerSettings.CyclesPerSet}"
             : $"- / {TimerSettings.CyclesPerSet}";
 
+    /// <summary>ミニ表示用の短い表示。例：「作業中 18:32 2/4」「待機（昼休憩）」。</summary>
+    public static string Compact(TimerStatus status) =>
+        status.IsRunning
+            ? $"{PhaseName(status)} {Remaining(status)} {status.Cycle}/{TimerSettings.CyclesPerSet}"
+            : PhaseName(status);
+
     /// <summary>1行の要約。例：「作業中 18:32（2/4）」「待機（昼休憩）」。</summary>
     public static string Summary(TimerStatus status) =>
         status.IsRunning

@@ -1,7 +1,11 @@
-﻿using System.Windows;
+﻿using System.Diagnostics;
+using System.IO;
+using System.Windows;
 using System.Windows.Threading;
 using PomodoroTimer.App.ViewModels;
 using PomodoroTimer.Core;
+using DrawingPoint = System.Drawing.Point;
+using WinFormsCursor = System.Windows.Forms.Cursor;
 
 namespace PomodoroTimer.App;
 
@@ -20,8 +24,11 @@ public partial class App : Application
     private MainViewModel? _mainViewModel;
     private MainWindow? _mainWindow;
     private SettingsWindow? _settingsWindow;
+    private SettingsViewModel? _settingsViewModel;
+    private MiniWidgetViewModel? _miniWidgetViewModel;
+    private MiniWidgetWindow? _miniWidget;
 
-    /// <summary>終了処理中か。メイン画面はこの間だけ本当に閉じる。</summary>
+    /// <summary>終了処理中か。メイン画面とミニ表示はこの間だけ本当に閉じる。</summary>
     internal bool IsExiting { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
@@ -48,14 +55,17 @@ public partial class App : Application
         _notifier = new ToastNotifier();
         _controller.NotificationRequested += (_, message) => _notifier.Show(message);
 
-        // ON/OFF や設定の保存で状態が変わったら、トレイとメイン画面をすぐ更新する
+        // ON/OFF や設定の保存で状態が変わったら、トレイ・メイン画面・ミニ表示をすぐ更新する
         _controller.StateChanged += (_, _) => RefreshViews();
 
         _mainViewModel = new MainViewModel(_controller, ShowSettingsWindow);
-        _trayIcon = new TrayIconService(_controller, ShowMainWindow, ShowSettingsWindow, ExitApplication);
+        _miniWidgetViewModel = new MiniWidgetViewModel(_controller);
+        _trayIcon = new TrayIconService(_controller, ShowMainWindow, ToggleMiniWidget, ShowSettingsWindow, ExitApplication);
 
         // 起動直後に1回計算してから、1秒ごとに再計算する（UIスレッドで動くタイマー）
         Tick();
+        ApplyMiniWidgetVisibility();
+
         _timer = new DispatcherTimer(DispatcherPriority.Normal)
         {
             Interval = TimeSpan.FromSeconds(1),
@@ -81,7 +91,7 @@ public partial class App : Application
 
     protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
     {
-        // Windows のサインアウト・シャットダウン時は、メイン画面を隠さずに閉じる
+        // Windows のサインアウト・シャットダウン時は、メイン画面やミニ表示を隠さずに閉じる
         IsExiting = true;
         base.OnSessionEnding(e);
     }
@@ -96,6 +106,7 @@ public partial class App : Application
     {
         _trayIcon?.Refresh();
         _mainViewModel?.Refresh();
+        _miniWidgetViewModel?.Refresh();
     }
 
     /// <summary>メイン画面を開く。すでに開いていれば前面に出す。</summary>
@@ -110,11 +121,80 @@ public partial class App : Application
     {
         if (_settingsWindow is null)
         {
-            _settingsWindow = new SettingsWindow(new SettingsViewModel(_controller!, _repository!));
-            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+            _settingsViewModel = new SettingsViewModel(_controller!, _repository!);
+            _settingsWindow = new SettingsWindow(_settingsViewModel);
+            _settingsWindow.Closed += (_, _) =>
+            {
+                _settingsWindow = null;
+                _settingsViewModel = null;
+
+                // 設定画面で「ミニ表示を表示する」が変わっていれば反映する
+                ApplyMiniWidgetVisibility();
+            };
         }
 
         BringToFront(_settingsWindow);
+    }
+
+    /// <summary>
+    /// メニューからミニ表示を切り替える。設定の「ミニ表示を表示する」と同じ値として保存する。
+    /// タイマーの計算に関わる設定は変えないので、タイマーの状態・ON/OFF・通知には影響しない。
+    /// </summary>
+    private void ToggleMiniWidget()
+    {
+        var settings = _controller!.Settings with { ShowMiniWidget = !_controller.Settings.ShowMiniWidget };
+
+        try
+        {
+            _repository!.Save(settings);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // 保存できなくても、表示の切り替えは行う
+            Debug.WriteLine($"ミニ表示の設定を保存できませんでした: {ex}");
+        }
+
+        _controller.UpdateSettings(settings);
+
+        // 設定画面を開いていれば、そのチェックも合わせる（あとで保存しても元に戻らないように）
+        if (_settingsViewModel is not null)
+        {
+            _settingsViewModel.ShowMiniWidget = settings.ShowMiniWidget;
+        }
+
+        ApplyMiniWidgetVisibility();
+        RefreshViews();
+    }
+
+    /// <summary>設定の「ミニ表示を表示する」に合わせて、ミニ表示を出す・隠す。</summary>
+    private void ApplyMiniWidgetVisibility()
+    {
+        if (_controller!.Settings.ShowMiniWidget)
+        {
+            _miniWidget ??= new MiniWidgetWindow(
+                _miniWidgetViewModel!,
+                _repository!.MiniWidgetPosition,
+                onClick: ShowMainWindow,
+                onRightClick: () => _trayIcon?.ShowMenu(WinFormsCursor.Position),
+                onMoved: SaveMiniWidgetPosition);
+            _miniWidget.Show();
+        }
+        else
+        {
+            _miniWidget?.Hide();
+        }
+    }
+
+    private void SaveMiniWidgetPosition(DrawingPoint position)
+    {
+        try
+        {
+            _repository!.SaveMiniWidgetPosition(position);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            Debug.WriteLine($"ミニ表示の位置を保存できませんでした: {ex}");
+        }
     }
 
     private static void BringToFront(Window window)
@@ -130,6 +210,7 @@ public partial class App : Application
 
     private void ExitApplication()
     {
+        // ミニ表示とメイン画面は Alt+F4 や×ボタンでは閉じないが、終了処理中は閉じられるようにする
         IsExiting = true;
         Shutdown();
     }
