@@ -66,7 +66,7 @@ public sealed class TimerController
     /// <summary>
     /// 設定を差し替える。タイマーの計算に関わる設定（就業時間・昼休憩・長い休憩の長さ）が変わったときだけ、
     /// ON にし直したときと同じ扱いにする（OFF 中なら ON になり、就業時間内ならその時点から1サイクル目を始める）。
-    /// それ以外（ミニ表示・自動起動）だけの変更では、タイマーの状態・ON/OFF・通知に影響させない。
+    /// それ以外（ミニ表示）だけの変更では、タイマーの状態・ON/OFF・通知に影響させない。
     /// </summary>
     public void UpdateSettings(TimerSettings settings)
     {

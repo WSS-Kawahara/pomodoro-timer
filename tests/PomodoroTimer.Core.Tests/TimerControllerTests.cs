@@ -535,11 +535,8 @@ public class TimerControllerTests
         Assert.Equal(At(9, 50), h.Controller.Status.PhaseStart);
     }
 
-    [Theory]
-    [InlineData(false, false)] // ミニ表示だけ変更
-    [InlineData(true, true)]   // 自動起動だけ変更
-    [InlineData(false, true)]  // 両方変更
-    public void ミニ表示と自動起動だけの変更ではタイマーに影響しない(bool showMiniWidget, bool launchAtLogin)
+    [Fact]
+    public void ミニ表示だけの変更ではタイマーに影響しない()
     {
         var h = new Harness(At(9, 0));
         h.TickAt(At(9, 40)); // 2サイクル目の作業中（9:30 開始）
@@ -547,7 +544,7 @@ public class TimerControllerTests
         h.Changes.Clear();
 
         h.Clock.Now = At(9, 50);
-        var settings = new TimerSettings { ShowMiniWidget = showMiniWidget, LaunchAtLogin = launchAtLogin };
+        var settings = new TimerSettings { ShowMiniWidget = false };
         h.Controller.UpdateSettings(settings);
 
         Assert.Same(settings, h.Controller.Settings);

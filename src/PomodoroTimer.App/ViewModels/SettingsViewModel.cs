@@ -34,9 +34,6 @@ public partial class SettingsViewModel : ObservableObject
     private bool _showMiniWidget;
 
     [ObservableProperty]
-    private bool _launchAtLogin;
-
-    [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasError))]
     private string _errorMessage = "";
 
@@ -52,7 +49,6 @@ public partial class SettingsViewModel : ObservableObject
         _lunchEndText = FormatTime(s.LunchEnd);
         _longBreakMinutesText = s.LongBreakMinutes.ToString(CultureInfo.InvariantCulture);
         _showMiniWidget = s.ShowMiniWidget;
-        _launchAtLogin = s.LaunchAtLogin;
     }
 
     /// <summary>画面を閉じてほしいときに発生する。</summary>
@@ -89,7 +85,6 @@ public partial class SettingsViewModel : ObservableObject
             LunchEnd = lunchEnd,
             LongBreakMinutes = longBreakMinutes,
             ShowMiniWidget = ShowMiniWidget,
-            LaunchAtLogin = LaunchAtLogin,
         };
 
         var validationErrors = settings.Validate();

@@ -30,9 +30,6 @@ public sealed record TimerSettings
     /// <summary>ミニ表示を表示するか。</summary>
     public bool ShowMiniWidget { get; init; } = true;
 
-    /// <summary>Windowsログイン時に自動起動するか。</summary>
-    public bool LaunchAtLogin { get; init; } = false;
-
     /// <summary>長い休憩の長さ。</summary>
     public TimeSpan LongBreakDuration => TimeSpan.FromMinutes(LongBreakMinutes);
 

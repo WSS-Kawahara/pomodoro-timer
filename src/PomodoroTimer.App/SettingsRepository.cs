@@ -101,7 +101,7 @@ public sealed class SettingsRepository
         File.Move(tempPath, _path, overwrite: true);
     }
 
-    /// <summary>JSON に書き出す形。項目が欠けていれば初期値を使う（古いファイルも読める）。</summary>
+    /// <summary>JSON に書き出す形。項目が欠けていれば初期値を使い、知らない項目は無視する（古いファイルも読める）。</summary>
     private sealed class SettingsData
     {
         private static readonly TimerSettings Defaults = new();
@@ -113,7 +113,6 @@ public sealed class SettingsRepository
         public TimeOnly LunchEnd { get; set; } = Defaults.LunchEnd;
         public int LongBreakMinutes { get; set; } = Defaults.LongBreakMinutes;
         public bool ShowMiniWidget { get; set; } = Defaults.ShowMiniWidget;
-        public bool LaunchAtLogin { get; set; } = Defaults.LaunchAtLogin;
 
         // 画面の都合の値：ミニ表示の位置（画面のピクセル座標）
         public int? MiniWidgetX { get; set; }
@@ -129,7 +128,6 @@ public sealed class SettingsRepository
             LunchEnd = s.LunchEnd;
             LongBreakMinutes = s.LongBreakMinutes;
             ShowMiniWidget = s.ShowMiniWidget;
-            LaunchAtLogin = s.LaunchAtLogin;
         }
 
         public TimerSettings ToSettings() => new()
@@ -140,7 +138,6 @@ public sealed class SettingsRepository
             LunchEnd = LunchEnd,
             LongBreakMinutes = LongBreakMinutes,
             ShowMiniWidget = ShowMiniWidget,
-            LaunchAtLogin = LaunchAtLogin,
         };
     }
 }

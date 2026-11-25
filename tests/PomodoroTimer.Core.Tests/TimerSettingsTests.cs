@@ -14,7 +14,6 @@ public class TimerSettingsTests
         Assert.Equal(new TimeOnly(13, 0), settings.LunchEnd);
         Assert.Equal(15, settings.LongBreakMinutes);
         Assert.True(settings.ShowMiniWidget);
-        Assert.False(settings.LaunchAtLogin);
     }
 
     [Fact]

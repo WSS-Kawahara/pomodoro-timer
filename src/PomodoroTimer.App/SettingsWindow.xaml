@@ -56,7 +56,6 @@
         <TextBlock Text="時刻は「9:00」の形式で入力してください" Foreground="Gray" Margin="4,4,0,0" />
 
         <CheckBox Content="ミニ表示を表示する" IsChecked="{Binding ShowMiniWidget}" Margin="4,12,0,0" />
-        <CheckBox Content="Windowsログイン時に自動起動する" IsChecked="{Binding LaunchAtLogin}" Margin="4,8,0,0" />
 
         <!-- 入力チェックのエラー -->
         <TextBlock Text="{Binding ErrorMessage}"
