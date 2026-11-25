@@ -19,4 +19,8 @@
     <ProjectReference Include="..\PomodoroTimer.Core\PomodoroTimer.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+  </ItemGroup>
+
 </Project>

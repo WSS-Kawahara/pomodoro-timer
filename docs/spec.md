@@ -20,6 +20,7 @@
 | 12 | 動作環境 | 会社のWindows PC。.NET同梱の単一exeで配布 |
 | 13 | 会社独自の休日 | 年末年始などはON/OFFボタンで止める運用（アプリ側の対応なし） |
 | 14 | ミニ表示 | タスクバーのすぐ上に小さな表示を常駐（状態の色・残り時間・サイクル数）。表示・非表示を設定で切り替え可能 |
+| 15 | 二重起動防止 | すでに起動中なら、2つ目は何もせず終了する |
 
 ## 2. 状態
 
@@ -109,3 +110,4 @@
 | App | ToastNotifier.cs | Windows通知 |
 | App | SettingsRepository.cs | 設定のJSON保存・読み込み |
 | App | StartupRegistrar.cs | スタートアップ登録・解除 |
+| App | SystemClock.cs | 現在時刻の実装（IClock） |

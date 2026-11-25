@@ -7,7 +7,7 @@
 ## 技術スタック
 
 - C# / WPF / .NET 10
-- TargetFramework は `net10.0-windows10.0.17763.0`（トースト通知ライブラリの要件）
+- TargetFramework は App のみ `net10.0-windows10.0.17763.0`（トースト通知ライブラリの要件）。Core と Core.Tests は `net10.0`
 - タスクトレイ：WinForms の `NotifyIcon`（App プロジェクトで `UseWindowsForms` を有効にする）
 - Windows通知：`Microsoft.Toolkit.Uwp.Notifications`
 - MVVM：`CommunityToolkit.Mvvm`

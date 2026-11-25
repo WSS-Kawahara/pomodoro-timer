@@ -314,6 +314,49 @@ public class TimerControllerTests
     }
 
     [Fact]
+    public void 作業中のままスリープして翌朝に復帰したらお疲れさまでしたを通知しない()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(17, 30));
+        h.Notifications.Clear();
+
+        // 水曜 17:30（作業中）→ 木曜 8:50（始業前）
+        h.TickAt(Wednesday.AddDays(1).ToDateTime(new TimeOnly(8, 50)));
+
+        Assert.Empty(h.Notifications);
+        Assert.Equal(IdleReason.OutsideWorkingHours, h.Controller.Status.IdleReason);
+    }
+
+    [Fact]
+    public void 金曜に作業中のままスリープして月曜朝に復帰したらお疲れさまでしたを通知しない()
+    {
+        var friday = new DateOnly(2026, 11, 27);
+        var monday = new DateOnly(2026, 11, 30);
+        var h = new Harness(friday.ToDateTime(new TimeOnly(9, 0)));
+        h.TickAt(friday.ToDateTime(new TimeOnly(17, 30)));
+        h.Notifications.Clear();
+
+        h.TickAt(monday.ToDateTime(new TimeOnly(8, 50)));
+
+        Assert.Empty(h.Notifications);
+        Assert.Equal(IdleReason.OutsideWorkingHours, h.Controller.Status.IdleReason);
+    }
+
+    [Fact]
+    public void 作業中のままスリープして翌日の昼休憩中に復帰したらお昼休憩ですを通知しない()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(11, 0));
+        h.Notifications.Clear();
+
+        // 水曜 11:00（作業中）→ 木曜 12:30（昼休憩中）
+        h.TickAt(Wednesday.AddDays(1).ToDateTime(new TimeOnly(12, 30)));
+
+        Assert.Empty(h.Notifications);
+        Assert.Equal(IdleReason.LunchBreak, h.Controller.Status.IdleReason);
+    }
+
+    [Fact]
     public void 休日は待機で通知しない()
     {
         var saturday = new DateOnly(2026, 11, 28);

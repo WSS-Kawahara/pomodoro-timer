@@ -87,7 +87,7 @@ public sealed class TimerController
 
         StateChanged?.Invoke(this, current);
 
-        if (NotificationMessages.For(previous, current) is { } message)
+        if (NotificationMessages.For(previous, current, today) is { } message)
         {
             NotificationRequested?.Invoke(this, message);
         }

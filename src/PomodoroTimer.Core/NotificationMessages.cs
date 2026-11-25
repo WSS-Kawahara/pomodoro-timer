@@ -14,11 +14,17 @@ public static class NotificationMessages
     /// 前回の状態から今回の状態に切り替わったときの通知文言を返す。通知しない場合は null。
     /// スリープ明けなどで複数の切り替わりをまたいだ場合も、今回の状態の分だけを返す。
     /// </summary>
+    /// <remarks>
+    /// 「お昼休憩です」「お疲れさまでした」は、前回のフェーズの開始日が今日と同じ場合だけ返す。
+    /// 作業中のままスリープして翌日以降に復帰したときに、古い切り替わりを通知しないため。
+    /// </remarks>
     /// <param name="previous">前回の状態。起動直後は null。</param>
     /// <param name="current">今回の状態。</param>
-    public static string? For(TimerStatus? previous, TimerStatus current)
+    /// <param name="today">現在の日付。</param>
+    public static string? For(TimerStatus? previous, TimerStatus current, DateOnly today)
     {
-        var wasRunning = previous?.IsRunning ?? false;
+        var wasRunningToday = previous is { IsRunning: true, PhaseStart: { } previousStart }
+            && DateOnly.FromDateTime(previousStart) == today;
 
         return current.Phase switch
         {
@@ -27,8 +33,8 @@ public static class NotificationMessages
                 : WorkStart,
             TimerPhase.ShortBreak => ShortBreak,
             TimerPhase.LongBreak => LongBreak,
-            TimerPhase.Idle when wasRunning && current.IdleReason == IdleReason.LunchBreak => LunchBreak,
-            TimerPhase.Idle when wasRunning && current.IdleReason == IdleReason.OutsideWorkingHours => EndOfDay,
+            TimerPhase.Idle when wasRunningToday && current.IdleReason == IdleReason.LunchBreak => LunchBreak,
+            TimerPhase.Idle when wasRunningToday && current.IdleReason == IdleReason.OutsideWorkingHours => EndOfDay,
             _ => null,
         };
     }
