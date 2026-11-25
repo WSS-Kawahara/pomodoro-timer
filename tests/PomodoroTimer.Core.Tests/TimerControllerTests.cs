@@ -10,6 +10,9 @@ public class TimerControllerTests
     private static DateTime At(int hour, int minute, int second = 0) =>
         Wednesday.ToDateTime(new TimeOnly(hour, minute, second));
 
+    /// <summary>初期値から、タイマーの計算に関わる設定（長い休憩の長さ）だけを変えた設定。</summary>
+    private static readonly TimerSettings ChangedTimerSettings = new() { LongBreakMinutes = 20 };
+
     private sealed class Harness
     {
         public FakeClock Clock { get; }
@@ -386,5 +389,207 @@ public class TimerControllerTests
         h.TickAt(At(10, 0));
 
         Assert.False(h.Controller.NeedsHolidayDataUpdate);
+    }
+
+    [Fact]
+    public void 設定を差し替えるとSettingsが新しい設定を返す()
+    {
+        var h = new Harness(At(9, 0));
+        var settings = new TimerSettings { LongBreakMinutes = 30 };
+
+        h.Controller.UpdateSettings(settings);
+
+        Assert.Same(settings, h.Controller.Settings);
+    }
+
+    [Fact]
+    public void 作業中に設定を保存するとその時点から1サイクル目で作業開始を通知()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(9, 40)); // 2サイクル目の作業中
+        h.Notifications.Clear();
+
+        h.Clock.Now = At(9, 50);
+        h.Controller.UpdateSettings(ChangedTimerSettings);
+
+        Assert.Equal([NotificationMessages.WorkStart], h.Notifications);
+        Assert.Equal(TimerPhase.Working, h.Controller.Status.Phase);
+        Assert.Equal(1, h.Controller.Status.Cycle);
+        Assert.Equal(At(9, 50), h.Controller.Status.PhaseStart);
+        Assert.Equal(TimeSpan.FromMinutes(25), h.Controller.Status.Remaining);
+    }
+
+    [Fact]
+    public void 休憩中に設定を保存すると作業中になり作業開始を通知()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(9, 27)); // 休憩中
+        h.Notifications.Clear();
+
+        h.Controller.UpdateSettings(ChangedTimerSettings);
+
+        Assert.Equal([NotificationMessages.WorkStart], h.Notifications);
+        Assert.Equal(TimerPhase.Working, h.Controller.Status.Phase);
+        Assert.Equal(1, h.Controller.Status.Cycle);
+    }
+
+    [Fact]
+    public void OFF中に設定を保存するとONになる()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(10, 0));
+        h.Controller.TurnOff();
+        h.Notifications.Clear();
+
+        h.Clock.Now = At(10, 5);
+        h.Controller.UpdateSettings(ChangedTimerSettings);
+
+        Assert.True(h.Controller.IsOn);
+        Assert.Equal([NotificationMessages.WorkStart], h.Notifications);
+        Assert.Equal(At(10, 5), h.Controller.Status.PhaseStart);
+    }
+
+    [Theory]
+    [InlineData(12, 30, IdleReason.LunchBreak)]
+    [InlineData(18, 0, IdleReason.OutsideWorkingHours)]
+    public void 就業時間外や昼休憩中に設定を保存すると待機で通知しない(int hour, int minute, IdleReason reason)
+    {
+        var h = new Harness(At(hour, minute));
+        h.TickAt(At(hour, minute));
+
+        h.Controller.UpdateSettings(ChangedTimerSettings);
+
+        Assert.Empty(h.Notifications);
+        Assert.Equal(TimerPhase.Idle, h.Controller.Status.Phase);
+        Assert.Equal(reason, h.Controller.Status.IdleReason);
+    }
+
+    [Fact]
+    public void OFF中に時間外で設定を保存するとONになり待機()
+    {
+        var h = new Harness(At(18, 0));
+        h.TickAt(At(18, 0));
+        h.Controller.TurnOff();
+
+        h.Controller.UpdateSettings(ChangedTimerSettings);
+
+        Assert.True(h.Controller.IsOn);
+        Assert.Equal(TimerPhase.Idle, h.Controller.Status.Phase);
+        Assert.Empty(h.Notifications);
+    }
+
+    [Fact]
+    public void 保存した設定で以降の計算が行われる()
+    {
+        var h = new Harness(At(8, 0));
+        h.TickAt(At(8, 0));
+
+        h.Controller.UpdateSettings(new TimerSettings
+        {
+            WorkStart = new TimeOnly(8, 30),
+            WorkEnd = new TimeOnly(17, 0),
+            LongBreakMinutes = 30,
+        });
+
+        // 8:30 開始。作業4の後（10:25）から長い休憩 30分
+        h.TickAt(At(8, 30));
+        Assert.Equal(TimerPhase.Working, h.Controller.Status.Phase);
+        Assert.Equal(At(8, 30), h.Controller.Status.PhaseStart);
+
+        h.TickAt(At(10, 25));
+        Assert.Equal(TimerPhase.LongBreak, h.Controller.Status.Phase);
+        Assert.Equal(TimeSpan.FromMinutes(30), h.Controller.Status.Remaining);
+
+        // 終業は 17:00
+        h.TickAt(At(17, 0));
+        Assert.Equal(IdleReason.OutsideWorkingHours, h.Controller.Status.IdleReason);
+    }
+
+    public static TheoryData<string> TimerSettingNames =>
+        ["WorkStart", "WorkEnd", "LunchStart", "LunchEnd", "LongBreakMinutes"];
+
+    /// <summary>初期値から、指定した計算に関わる設定を1つだけ変える。</summary>
+    private static TimerSettings ChangeOne(string name) => name switch
+    {
+        "WorkStart" => new TimerSettings { WorkStart = new TimeOnly(8, 30) },
+        "WorkEnd" => new TimerSettings { WorkEnd = new TimeOnly(18, 0) },
+        "LunchStart" => new TimerSettings { LunchStart = new TimeOnly(11, 30) },
+        "LunchEnd" => new TimerSettings { LunchEnd = new TimeOnly(12, 45) },
+        "LongBreakMinutes" => new TimerSettings { LongBreakMinutes = 20 },
+        _ => throw new ArgumentOutOfRangeException(nameof(name)),
+    };
+
+    [Theory]
+    [MemberData(nameof(TimerSettingNames))]
+    public void 計算に関わる設定が1つでも変わればONにし直したときと同じ扱い(string name)
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(9, 40)); // 2サイクル目の作業中
+        h.Notifications.Clear();
+
+        h.Clock.Now = At(9, 50);
+        h.Controller.UpdateSettings(ChangeOne(name));
+
+        Assert.Equal([NotificationMessages.WorkStart], h.Notifications);
+        Assert.Equal(1, h.Controller.Status.Cycle);
+        Assert.Equal(At(9, 50), h.Controller.Status.PhaseStart);
+    }
+
+    [Theory]
+    [InlineData(false, false)] // ミニ表示だけ変更
+    [InlineData(true, true)]   // 自動起動だけ変更
+    [InlineData(false, true)]  // 両方変更
+    public void ミニ表示と自動起動だけの変更ではタイマーに影響しない(bool showMiniWidget, bool launchAtLogin)
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(9, 40)); // 2サイクル目の作業中（9:30 開始）
+        h.Notifications.Clear();
+        h.Changes.Clear();
+
+        h.Clock.Now = At(9, 50);
+        var settings = new TimerSettings { ShowMiniWidget = showMiniWidget, LaunchAtLogin = launchAtLogin };
+        h.Controller.UpdateSettings(settings);
+
+        Assert.Same(settings, h.Controller.Settings);
+        Assert.Empty(h.Notifications);
+        Assert.Empty(h.Changes);
+        Assert.Equal(2, h.Controller.Status.Cycle);
+        Assert.Equal(At(9, 30), h.Controller.Status.PhaseStart);
+
+        // 以降の Tick でも元のサイクルのまま進む
+        h.TickAt(At(9, 55));
+        Assert.Equal(TimerPhase.ShortBreak, h.Controller.Status.Phase);
+        Assert.Equal(2, h.Controller.Status.Cycle);
+        Assert.Equal([NotificationMessages.ShortBreak], h.Notifications);
+    }
+
+    [Fact]
+    public void OFF中にミニ表示だけ変えてもOFFのまま()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(10, 0));
+        h.Controller.TurnOff();
+        h.Notifications.Clear();
+        h.Changes.Clear();
+
+        h.Controller.UpdateSettings(new TimerSettings { ShowMiniWidget = false });
+
+        Assert.False(h.Controller.IsOn);
+        Assert.Equal(TimerPhase.Off, h.Controller.Status.Phase);
+        Assert.Empty(h.Notifications);
+        Assert.Empty(h.Changes);
+    }
+
+    [Fact]
+    public void 何も変えずに保存してもタイマーに影響しない()
+    {
+        var h = new Harness(At(9, 0));
+        h.TickAt(At(9, 40));
+        h.Notifications.Clear();
+
+        h.Controller.UpdateSettings(new TimerSettings());
+
+        Assert.Empty(h.Notifications);
+        Assert.Equal(At(9, 30), h.Controller.Status.PhaseStart);
     }
 }

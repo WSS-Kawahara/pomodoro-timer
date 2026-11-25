@@ -15,19 +15,29 @@ public sealed class TrayIconService : IDisposable
     private bool _disposed;
 
     /// <param name="controller">タイマー。</param>
+    /// <param name="onOpenMain">「画面を開く」・ダブルクリックのときの処理。</param>
+    /// <param name="onOpenSettings">「設定」が選ばれたときの処理。</param>
     /// <param name="onExit">「終了」が選ばれたときの処理。</param>
-    public TrayIconService(TimerController controller, Action onExit)
+    public TrayIconService(TimerController controller, Action onOpenMain, Action onOpenSettings, Action onExit)
     {
         _controller = controller;
 
+        var openItem = new ToolStripMenuItem("画面を開く");
+        openItem.Click += (_, _) => onOpenMain();
+
         _onOffItem = new ToolStripMenuItem("ON/OFF");
         _onOffItem.Click += (_, _) => ToggleOnOff();
+
+        var settingsItem = new ToolStripMenuItem("設定");
+        settingsItem.Click += (_, _) => onOpenSettings();
 
         var exitItem = new ToolStripMenuItem("終了");
         exitItem.Click += (_, _) => onExit();
 
         var menu = new ContextMenuStrip();
+        menu.Items.Add(openItem);
         menu.Items.Add(_onOffItem);
+        menu.Items.Add(settingsItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(exitItem);
 
@@ -39,6 +49,7 @@ public sealed class TrayIconService : IDisposable
             ContextMenuStrip = menu,
             Visible = true,
         };
+        _notifyIcon.DoubleClick += (_, _) => onOpenMain();
     }
 
     /// <summary>最新の状態でツールチップとメニューを更新する。</summary>
@@ -50,7 +61,7 @@ public sealed class TrayIconService : IDisposable
         }
 
         // NotifyIcon.Text は 127 文字まで
-        _notifyIcon.Text = $"{AppName}\n{FormatStatus(_controller.Status)}";
+        _notifyIcon.Text = $"{AppName}\n{StatusFormatter.Summary(_controller.Status)}";
         _onOffItem.Checked = _controller.IsOn;
     }
 
@@ -79,29 +90,5 @@ public sealed class TrayIconService : IDisposable
         {
             _controller.TurnOn();
         }
-
-        Refresh();
-    }
-
-    /// <summary>例：「作業中 18:32（2/4）」「待機（昼休憩）」。</summary>
-    private static string FormatStatus(TimerStatus status) => status.Phase switch
-    {
-        TimerPhase.Working => $"作業中 {FormatRemaining(status.Remaining)}（{status.Cycle}/{TimerSettings.CyclesPerSet}）",
-        TimerPhase.ShortBreak => $"休憩 {FormatRemaining(status.Remaining)}（{status.Cycle}/{TimerSettings.CyclesPerSet}）",
-        TimerPhase.LongBreak => $"長い休憩 {FormatRemaining(status.Remaining)}（{status.Cycle}/{TimerSettings.CyclesPerSet}）",
-        TimerPhase.Off => "OFF",
-        _ => status.IdleReason switch
-        {
-            IdleReason.LunchBreak => "待機（昼休憩）",
-            IdleReason.Holiday => "待機（休日）",
-            _ => "待機（時間外）",
-        },
-    };
-
-    /// <summary>残り時間を mm:ss で表す。1秒未満は切り上げる（開始直後に 25:00 と出るように）。</summary>
-    private static string FormatRemaining(TimeSpan remaining)
-    {
-        var totalSeconds = (int)Math.Ceiling(remaining.TotalSeconds);
-        return $"{totalSeconds / 60:D2}:{totalSeconds % 60:D2}";
     }
 }

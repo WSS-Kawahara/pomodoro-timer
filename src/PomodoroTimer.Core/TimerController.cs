@@ -6,7 +6,7 @@ public sealed class TimerController
 {
     private readonly IClock _clock;
     private readonly IHolidayCalendar _holidays;
-    private readonly TimerSettings _settings;
+    private TimerSettings _settings;
 
     /// <summary>起動した時刻、または ON にした時刻。</summary>
     private DateTime _baseTime;
@@ -34,6 +34,9 @@ public sealed class TimerController
     /// <summary>最新の計算結果。</summary>
     public TimerStatus Status { get; private set; } = TimerStatus.Idle(IdleReason.OutsideWorkingHours);
 
+    /// <summary>現在の設定。</summary>
+    public TimerSettings Settings => _settings;
+
     /// <summary>ON か。</summary>
     public bool IsOn => _offDate is null;
 
@@ -59,6 +62,38 @@ public sealed class TimerController
         _baseTime = now;
         Update(now);
     }
+
+    /// <summary>
+    /// 設定を差し替える。タイマーの計算に関わる設定（就業時間・昼休憩・長い休憩の長さ）が変わったときだけ、
+    /// ON にし直したときと同じ扱いにする（OFF 中なら ON になり、就業時間内ならその時点から1サイクル目を始める）。
+    /// それ以外（ミニ表示・自動起動）だけの変更では、タイマーの状態・ON/OFF・通知に影響させない。
+    /// </summary>
+    public void UpdateSettings(TimerSettings settings)
+    {
+        var timerSettingsChanged = !HasSameTimerSettings(_settings, settings);
+        _settings = settings;
+
+        if (!timerSettingsChanged)
+        {
+            return;
+        }
+
+        var now = _clock.Now;
+        _offDate = null;
+        _baseTime = now;
+
+        // OFF から ON にしたときと同じ通知になるよう、前回の状態を OFF とみなす
+        _previous = TimerStatus.Off;
+        Update(now);
+    }
+
+    /// <summary>タイマーの計算に関わる設定がすべて同じか。</summary>
+    private static bool HasSameTimerSettings(TimerSettings a, TimerSettings b) =>
+        a.WorkStart == b.WorkStart
+        && a.WorkEnd == b.WorkEnd
+        && a.LunchStart == b.LunchStart
+        && a.LunchEnd == b.LunchEnd
+        && a.LongBreakMinutes == b.LongBreakMinutes;
 
     private void Update(DateTime now)
     {

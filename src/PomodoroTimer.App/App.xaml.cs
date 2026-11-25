@@ -1,5 +1,6 @@
 ﻿using System.Windows;
 using System.Windows.Threading;
+using PomodoroTimer.App.ViewModels;
 using PomodoroTimer.Core;
 
 namespace PomodoroTimer.App;
@@ -13,8 +14,15 @@ public partial class App : Application
     private Mutex? _singleInstanceMutex;
     private DispatcherTimer? _timer;
     private TimerController? _controller;
+    private SettingsRepository? _repository;
     private TrayIconService? _trayIcon;
     private ToastNotifier? _notifier;
+    private MainViewModel? _mainViewModel;
+    private MainWindow? _mainWindow;
+    private SettingsWindow? _settingsWindow;
+
+    /// <summary>終了処理中か。メイン画面はこの間だけ本当に閉じる。</summary>
+    internal bool IsExiting { get; private set; }
 
     protected override void OnStartup(StartupEventArgs e)
     {
@@ -34,14 +42,17 @@ public partial class App : Application
         AppDomain.CurrentDomain.UnhandledException += (_, _) => _trayIcon?.Dispose();
         DispatcherUnhandledException += (_, _) => _trayIcon?.Dispose();
 
-        // 設定の保存・読み込みはまだ行わず、初期値を使う
-        var settings = new TimerSettings();
-        _controller = new TimerController(new SystemClock(), CsvHolidayCalendar.LoadEmbedded(), settings);
+        _repository = new SettingsRepository();
+        _controller = new TimerController(new SystemClock(), CsvHolidayCalendar.LoadEmbedded(), _repository.Load());
 
         _notifier = new ToastNotifier();
         _controller.NotificationRequested += (_, message) => _notifier.Show(message);
 
-        _trayIcon = new TrayIconService(_controller, onExit: Shutdown);
+        // ON/OFF や設定の保存で状態が変わったら、トレイとメイン画面をすぐ更新する
+        _controller.StateChanged += (_, _) => RefreshViews();
+
+        _mainViewModel = new MainViewModel(_controller, ShowSettingsWindow);
+        _trayIcon = new TrayIconService(_controller, ShowMainWindow, ShowSettingsWindow, ExitApplication);
 
         // 起動直後に1回計算してから、1秒ごとに再計算する（UIスレッドで動くタイマー）
         Tick();
@@ -55,6 +66,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        IsExiting = true;
         _timer?.Stop();
         _trayIcon?.Dispose();
 
@@ -67,9 +79,58 @@ public partial class App : Application
         base.OnExit(e);
     }
 
+    protected override void OnSessionEnding(SessionEndingCancelEventArgs e)
+    {
+        // Windows のサインアウト・シャットダウン時は、メイン画面を隠さずに閉じる
+        IsExiting = true;
+        base.OnSessionEnding(e);
+    }
+
     private void Tick()
     {
         _controller!.Tick();
-        _trayIcon!.Refresh();
+        RefreshViews();
+    }
+
+    private void RefreshViews()
+    {
+        _trayIcon?.Refresh();
+        _mainViewModel?.Refresh();
+    }
+
+    /// <summary>メイン画面を開く。すでに開いていれば前面に出す。</summary>
+    private void ShowMainWindow()
+    {
+        _mainWindow ??= new MainWindow { DataContext = _mainViewModel };
+        BringToFront(_mainWindow);
+    }
+
+    /// <summary>設定画面を開く。すでに開いていれば前面に出す。</summary>
+    private void ShowSettingsWindow()
+    {
+        if (_settingsWindow is null)
+        {
+            _settingsWindow = new SettingsWindow(new SettingsViewModel(_controller!, _repository!));
+            _settingsWindow.Closed += (_, _) => _settingsWindow = null;
+        }
+
+        BringToFront(_settingsWindow);
+    }
+
+    private static void BringToFront(Window window)
+    {
+        window.Show();
+        if (window.WindowState == WindowState.Minimized)
+        {
+            window.WindowState = WindowState.Normal;
+        }
+
+        window.Activate();
+    }
+
+    private void ExitApplication()
+    {
+        IsExiting = true;
+        Shutdown();
     }
 }
